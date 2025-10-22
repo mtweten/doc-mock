@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "spc-saas-documentation.fullname" . }}
+  labels:
+    {{- include "spc-saas-documentation.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "spc-saas-documentation.selectorLabels" . | nindent 4 }}

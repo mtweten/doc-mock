@@ -1,0 +1,80 @@
+name: Create and publish a Docker image
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  YAML_FILE: deploy/production.yaml
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      repository-projects: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Get the current git SHA
+        id: set_sha
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "git_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "git_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Compute tags
+        id: set_tags
+        run: |
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set_sha.outputs.git_sha }}"
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest,$TAGS"
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "Computed tags: $TAGS"
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.set_tags.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Update YAML file
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          TAG=$(echo "${{ github.sha }}")
+          echo "Using tag: $TAG"
+          yq -i ".image.tag = \"${TAG}\"" "${{ env.YAML_FILE }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ env.YAML_FILE }}"
+          git diff --cached --quiet && echo "No changes to commit." && exit 0
+          git commit -m "ci: update deploy image tag to ${TAG}"
+          git push
+      - name: Add label to PR
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Adding label 'preview-image-built' to PR #${{ github.event.pull_request.number }}"
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "preview-image-built"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
