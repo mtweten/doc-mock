@@ -61,14 +61,13 @@ jobs:
           TAG=$(echo "${{ github.sha }}")
           echo "Using tag: $TAG"
           yq -i ".image.tag = \"${TAG}\"" "${{ env.YAML_FILE }}"
-      - name: Commit and push YAML update
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "${{ env.YAML_FILE }}"
           git diff --cached --quiet && echo "No changes to commit." && exit 0
           git commit -m "chore: update image tag to ${TAG}"
           git push
+
             
   # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
   #   - name: Generate artifact attestation
