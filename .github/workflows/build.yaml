@@ -10,6 +10,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  YAML_FILE: deploy/production.yaml
 
 # There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
 jobs:
@@ -17,11 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
-      contents: read
+      contents: write
       packages: write
-      attestations: write
       id-token: write
-      #
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -61,7 +60,15 @@ jobs:
         run: |
           TAG=$(echo "${{ github.sha }}")
           echo "Using tag: $TAG"
-          yq -i ".image.tag = \"${TAG}\"" deploy/production.yaml
+          yq -i ".image.tag = \"${TAG}\"" "${{ env.YAML_FILE }}"
+      - name: Commit and push YAML update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ env.YAML_FILE }}"
+          git diff --cached --quiet && echo "No changes to commit." && exit 0
+          git commit -m "chore: update image tag to ${TAG}"
+          git push
             
   # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
   #   - name: Generate artifact attestation
