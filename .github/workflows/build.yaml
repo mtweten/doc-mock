@@ -22,6 +22,8 @@ jobs:
     permissions:
       contents: write
       packages: write
+      repository-projects: read
+      pull-requests: write
       id-token: write
     steps:
       - name: Checkout repository
@@ -76,6 +78,14 @@ jobs:
           git diff --cached --quiet && echo "No changes to commit." && exit 0
           git commit -m "chore: update image tag to ${TAG}"
           git push
+      - name: Add label to PR
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Adding label 'preview-image-built' to PR #${{ github.event.pull_request.number }}"
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "preview-image-built"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
             
   # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
