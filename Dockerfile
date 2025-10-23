@@ -1,6 +1,9 @@
 FROM hugomods/hugo:exts AS builder  
-WORKDIR /src  
-COPY . .  
+WORKDIR /src
+COPY . .
+RUN apk add --no-cache git \
+ && git submodule update --init --recursive
+
 RUN hugo --minify  
 
 FROM httpd:2.4-alpine  
