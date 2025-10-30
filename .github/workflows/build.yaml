@@ -9,7 +9,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  YAML_FILE: deploy/production.yaml
+  YAML_FILE: deploy/prd.yaml
 
 jobs:
   build-and-push-image:
