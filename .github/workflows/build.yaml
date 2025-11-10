@@ -59,18 +59,26 @@ jobs:
           push: true
           tags: ${{ steps.set_tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Generate GitHub App token
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - name: Update YAML file
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           TAG=$(echo "${{ github.sha }}")
           echo "Using tag: $TAG"
           yq -i ".image.tag = \"${TAG}\"" "${{ env.YAML_FILE }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "${{ env.YAML_FILE }}"
-          git diff --cached --quiet && echo "No changes to commit." && exit 0
-          git commit -m "ci: update deploy image tag to ${TAG}"
-          git push
+          gh api repos/${{ github.repository }}/contents/${{ env.YAML_FILE }} -X PUT \
+            -f message="ci: update deploy image tag to ${TAG}" \
+            -f content="$(cat ${{ env.YAML_FILE }} | base64)" \
+            -f sha="$(gh api repos/${{ github.repository }}/contents/${{ env.YAML_FILE }} --jq '.sha')" \
+            -f branch="main"
       - name: Add label to PR
         if: github.event_name == 'pull_request'
         run: |
