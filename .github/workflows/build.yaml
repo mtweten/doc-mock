@@ -75,7 +75,7 @@ jobs:
           echo "Using tag: $TAG"
           yq -i ".image.tag = \"${TAG}\"" "${{ env.YAML_FILE }}"
           gh api repos/${{ github.repository }}/contents/${{ env.YAML_FILE }} -X PUT \
-            -f message="ci: update deploy image tag to ${TAG}" \
+            -f message="[skip ci]: update deploy image tag to ${TAG}" \
             -f content="$(cat ${{ env.YAML_FILE }} | base64)" \
             -f sha="$(gh api repos/${{ github.repository }}/contents/${{ env.YAML_FILE }} --jq '.sha')" \
             -f branch="main"
